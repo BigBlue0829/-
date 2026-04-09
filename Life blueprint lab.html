@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>职业状态雷达图 | 设计人生·Lab</title>
+    <!-- 引入 Chart.js 用于雷达图绘制 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- 引入 html2canvas 用于截图保存 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #f0f2f5;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Helvetica, sans-serif;
+            padding: 24px 16px 48px;
+            color: #1e2a3e;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        /* 卡片样式 */
+        .card {
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+            padding: 24px 28px;
+            margin-bottom: 28px;
+            transition: all 0.2s ease;
+        }
+
+        h1 {
+            font-size: 1.9rem;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            background: linear-gradient(135deg, #1E2A3E, #2C3E66);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .sub {
+            color: #5b6e8c;
+            border-left: 4px solid #3b82f6;
+            padding-left: 16px;
+            margin-top: 8px;
+            margin-bottom: 24px;
+            font-size: 1rem;
+        }
+
+        .grid-2col {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 32px;
+        }
+
+        .controls-panel {
+            flex: 1.2;
+            min-width: 260px;
+        }
+
+        .chart-panel {
+            flex: 1;
+            min-width: 280px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .dimension-item {
+            margin-bottom: 24px;
+        }
+
+        .dimension-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .dimension-name {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .dimension-score {
+            background: #eef2ff;
+            padding: 2px 12px;
+            border-radius: 40px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #1e40af;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            background: #e2e8f0;
+            border-radius: 10px;
+            outline: none;
+        }
+
+        input[type="range"]:focus {
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #3b82f6;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            border: none;
+        }
+
+        .tip-text {
+            font-size: 0.75rem;
+            color: #6c7a91;
+            margin-top: 6px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .radar-container {
+            width: 100%;
+            max-width: 380px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: auto !important;
+            background: #ffffff;
+            border-radius: 24px;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 14px;
+            margin-top: 20px;
+        }
+
+        button {
+            background: white;
+            border: 1px solid #cbd5e1;
+            padding: 10px 20px;
+            border-radius: 40px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #1e293b;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button.primary {
+            background: #1e2a3e;
+            border-color: #1e2a3e;
+            color: white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        button.primary:hover {
+            background: #2c3e66;
+            transform: translateY(-1px);
+        }
+
+        button:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+        }
+
+        .result-card {
+            background: #f8fafc;
+            border-radius: 24px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 1px solid #e9eef3;
+        }
+
+        .insight-text {
+            font-size: 1rem;
+            line-height: 1.5;
+            color: #0f172a;
+            background: #ffffffd9;
+            padding: 16px;
+            border-radius: 20px;
+            margin-bottom: 16px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #e6f0ff;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #0369a1;
+        }
+
+        footer {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #7e8b9f;
+            margin-top: 32px;
+        }
+
+        @media (max-width: 800px) {
+            .card {
+                padding: 18px;
+            }
+            h1 {
+                font-size: 1.6rem;
+            }
+            .controls-panel, .chart-panel {
+                flex: 100%;
+            }
+            .radar-container {
+                max-width: 280px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h1>⚖️ 职业状态雷达图</h1>
+        <div class="sub">5分钟看清职业“失衡点” · 设计人生·Lab 原创工具</div>
+
+        <div class="grid-2col">
+            <!-- 左侧：评分滑块 -->
+            <div class="controls-panel">
+                <div style="margin-bottom: 12px; font-weight: 500;">🎛️ 拖动滑块评估每个维度 (1~7分)</div>
+                <div id="dimensions-list"></div>
+                <div style="margin-top: 16px; font-size: 0.8rem; color: #3b82f6; background: #eff6ff; padding: 10px; border-radius: 20px;">
+                    💡 <strong>你的感受最重要</strong> — 根据内心真实状态打分，无需与他人比较。
+                </div>
+            </div>
+
+            <!-- 右侧：雷达图及操作 -->
+            <div class="chart-panel">
+                <div class="radar-container">
+                    <canvas id="radarChart" width="400" height="400"></canvas>
+                </div>
+                <div class="action-buttons">
+                    <button id="downloadBtn" class="primary">📸 保存雷达图</button>
+                    <button id="resetBtn">⟳ 重置默认</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 动态洞察与行动建议 -->
+        <div class="result-card" id="insightBox">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
+                <span class="badge">📊 失衡指数 & 行动导航</span>
+                <span id="imbalanceTag" style="font-size: 0.8rem; background: #eef2ff; padding: 2px 12px; border-radius: 20px;"></span>
+            </div>
+            <div id="insightMessage" class="insight-text">
+                调整滑块后，这里将生成专属于你的职业洞察和下一步建议。
+            </div>
+            <div style="display: flex; justify-content: flex-end;">
+                <button id="getFullReportBtn" style="background: #1e2a3e; color: white; border: none;">📧 获取完整改善指南 →</button>
+            </div>
+        </div>
+        <footer>
+            🌱 基于设计思维 & 积极心理学 | 匿名数据仅用于优化工具 | 你的职业航海图从这里开始
+        </footer>
+    </div>
+</div>
+
+<script>
+    // ---------- 维度定义 (6个核心维度) ----------
+    const dimensions = [
+        { id: "growth", name: "📈 成长空间", lowDesc: "技能固化，重复劳动", highDesc: "持续挑战，学习曲线陡峭" },
+        { id: "meaning", name: "✨ 意义感", lowDesc: "工作缺乏价值，像螺丝钉", highDesc: "清晰看见自己的影响力" },
+        { id: "income", name: "💰 收入满意度", lowDesc: "付出与回报失衡", highDesc: "匹配努力且有增长预期" },
+        { id: "balance", name: "⚖️ 生活平衡", lowDesc: "工作严重挤压生活/健康", highDesc: "自由掌控节奏，恢复充足" },
+        { id: "social", name: "🤝 社交能量", lowDesc: "内卷/冷漠，消耗能量", highDesc: "协作顺畅，互相滋养" },
+        { id: "security", name: "🔮 未来安全感", lowDesc: "岗位边缘化，35岁危机感", highDesc: "技能可迁移，有Plan B" }
+    ];
+
+    // 默认分值 (中间值4)
+    let currentScores = [4, 4, 4, 4, 4, 4];
+
+    let chartInstance = null;
+
+    // 获取DOM元素
+    const dimensionsListDiv = document.getElementById('dimensions-list');
+    const insightMessageDiv = document.getElementById('insightMessage');
+    const imbalanceTagSpan = document.getElementById('imbalanceTag');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const getFullReportBtn = document.getElementById('getFullReportBtn');
+
+    // ---------- 生成滑块UI ----------
+    function buildSliders() {
+        dimensionsListDiv.innerHTML = '';
+        dimensions.forEach((dim, idx) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'dimension-item';
+
+            const header = document.createElement('div');
+            header.className = 'dimension-header';
+            header.innerHTML = `<span class="dimension-name">${dim.name}</span><span class="dimension-score" id="scoreLabel-${idx}">${currentScores[idx]}</span>`;
+            
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.min = 1;
+            slider.max = 7;
+            slider.step = 1;
+            slider.value = currentScores[idx];
+            slider.addEventListener('input', (e) => {
+                const newVal = parseInt(e.target.value, 10);
+                currentScores[idx] = newVal;
+                document.getElementById(`scoreLabel-${idx}`).innerText = newVal;
+                updateRadarChart();
+                updateInsights();
+            });
+
+            const tipSpan = document.createElement('div');
+            tipSpan.className = 'tip-text';
+            tipSpan.innerHTML = `<span>😟 ${dim.lowDesc}</span><span>😊 ${dim.highDesc}</span>`;
+
+            itemDiv.appendChild(header);
+            itemDiv.appendChild(slider);
+            itemDiv.appendChild(tipSpan);
+            dimensionsListDiv.appendChild(itemDiv);
+        });
+    }
+
+    // 计算失衡指数 (最高分 - 最低分)
+    function calculateImbalanceIndex(scores) {
+        const maxVal = Math.max(...scores);
+        const minVal = Math.min(...scores);
+        return (maxVal - minVal).toFixed(1);
+    }
+
+    // 核心洞察逻辑 (基于6个维度数值生成教练式反馈)
+    function generateInsight(scores) {
+        const labelsShort = ["成长", "意义", "收入", "平衡", "社交", "未来"];
+        const avgScore = scores.reduce((a,b) => a+b,0)/scores.length;
+        const minVal = Math.min(...scores);
+        const maxVal = Math.max(...scores);
+        const minIndex = scores.indexOf(minVal);
+        const maxIndex = scores.indexOf(maxVal);
+        const weakDim = dimensions[minIndex].name;
+        const strongDim = dimensions[maxIndex].name;
+        const imbalance = (maxVal - minVal).toFixed(1);
+
+        // 判断模式
+        let pattern = "";
+        let advice = "";
+
+        // 高收入 + 低平衡/低意义 典型金手铐
+        const incomeIdx = 2; // 收入维度索引
+        const balanceIdx = 3;
+        const meaningIdx = 1;
+        if (scores[incomeIdx] >= 5 && (scores[balanceIdx] <= 3 || scores[meaningIdx] <= 3)) {
+            pattern = "💰 金手铐模式";
+            advice = "你的收入很有优势，但代价正在侵蚀生活或意义感。可以尝试用「收入换时间」：探索弹性工作、副业原型，或者用部分储蓄投资于转型学习。";
+        } 
+        // 低成长 + 低安全感  危险信号
+        else if (scores[0] <= 3 && scores[5] <= 3) {
+            pattern = "⚠️ 冰面预警";
+            advice = "你感到脚下的冰在裂开。行动是恐惧的解药：本周做一次「技能审计」，找出可迁移能力，并约谈一位已经成功转型的前辈。";
+        }
+        // 全面平庸 (全部3-5分)
+        else if (scores.every(s => s >= 3 && s <= 5)) {
+            pattern = "🌊 温水状态";
+            advice = "不烫也不凉，但缺少波澜。也许你需要的不是修补短板，而是创造一个让你兴奋的「奥德赛版本」。尝试写下一个完全疯狂的职业方向，小范围测试一下反应。";
+        }
+        // 社交能量最低
+        else if (minIndex === 4) {
+            pattern = "🪫 社交透支";
+            advice = "人际关系消耗了你太多能量。建议设定「社交边界日」，每周留出2天专注自己的高价值工作，远离无效站队。同时可寻找外部同行社群重建支持系统。";
+        }
+        // 平衡最低
+        else if (minIndex === 3) {
+            pattern = "🏃‍♂️ 过劳倾斜";
+            advice = "你的职业状态严重向工作倾斜。即使无法立刻改变工作量，也可以从微小的「恢复仪式」开始：每天30分钟完全脱离屏幕的时间。";
+        } 
+        else {
+            pattern = "🎯 杠杆聚焦";
+            advice = `你的优势在「${strongDim}」，短板在「${weakDim}」。可以尝试用优势带动短板：例如利用成长空间设计一个小型学习项目，同时改善对未来安全感的焦虑。`;
+        }
+
+        // 补充具体建议
+        const imbalanceLevel = imbalance > 3.5 ? "高度失衡" : (imbalance > 2 ? "中度失衡" : "相对均衡");
+        const imbalanceDesc = `失衡指数 ${imbalance} (${imbalanceLevel})`;
+        
+        let fullText = `【${pattern}】 ${advice}<br><br>`;
+        fullText += `✨ 你的最大优势维度：${strongDim} (${maxVal}分) ；最大成长空间：${weakDim} (${minVal}分)。<br>`;
+        fullText += `🎯 下一步小行动：针对「${weakDim}」，选择一个能在下周完成的微型实验（例如：访谈一位该领域做的出色的人，或参与一节体验课）。<br>`;
+        fullText += `📌 记住：你不是一个人，83%的互联网从业者在至少两个维度感到失衡。觉察就是改变的开始。`;
+        
+        return { fullText, imbalanceDesc, pattern };
+    }
+
+    // 更新雷达图
+    function updateRadarChart() {
+        const ctx = document.getElementById('radarChart').getContext('2d');
+        const labels = dimensions.map(d => d.name.split(' ')[1] || d.name); // 简标
+        const rawLabels = dimensions.map(d => d.name);
+        
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+        
+        chartInstance = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: rawLabels,
+                datasets: [{
+                    label: '你的职业状态评分',
+                    data: [...currentScores],
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    borderColor: '#3b82f6',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#1e40af',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 7,
+                        min: 1,
+                        ticks: {
+                            stepSize: 1,
+                            backdropColor: 'transparent'
+                        },
+                        grid: {
+                            color: '#e2e8f0'
+                        },
+                        pointLabels: {
+                            font: { size: 12, weight: '500' },
+                            color: '#334155'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw} 分` } },
+                    legend: { position: 'top', labels: { font: { size: 11 } } }
+                }
+            }
+        });
+    }
+
+    // 更新洞察区域及失衡标签
+    function updateInsights() {
+        const { fullText, imbalanceDesc, pattern } = generateInsight(currentScores);
+        insightMessageDiv.innerHTML = fullText;
+        imbalanceTagSpan.innerHTML = imbalanceDesc;
+        // 额外微动效
+    }
+
+    // 重置所有分数到4
+    function resetScores() {
+        for (let i = 0; i < currentScores.length; i++) {
+            currentScores[i] = 4;
+            const labelSpan = document.getElementById(`scoreLabel-${i}`);
+            if (labelSpan) labelSpan.innerText = '4';
+            const sliders = document.querySelectorAll('.dimension-item input[type="range"]');
+            if (sliders[i]) sliders[i].value = '4';
+        }
+        updateRadarChart();
+        updateInsights();
+    }
+
+    // 保存雷达图为图片 (使用html2canvas)
+    async function saveRadarAsImage() {
+        const canvasElement = document.getElementById('radarChart');
+        if (!canvasElement) return;
+        // 由于canvas背景白色，直接截图canvas区域即可，但为了清晰度，我们用html2canvas捕获整个卡片或canvas容器
+        // 更优雅：单独截图canvas周围小区域
+        const radarContainer = document.querySelector('.radar-container');
+        if (!radarContainer) return;
+        try {
+            const canvasImg = await html2canvas(radarContainer, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                logging: false,
+                useCORS: false
+            });
+            const link = document.createElement('a');
+            link.download = `career_radar_${new Date().toISOString().slice(0,19)}.png`;
+            link.href = canvasImg.toDataURL();
+            link.click();
+        } catch (err) {
+            alert("生成图片失败，可尝试刷新页面重试。");
+            console.error(err);
+        }
+    }
+
+    // 获取完整报告（邮箱收集+模拟导流）
+    function handleGetFullReport() {
+        // 弹窗收集邮箱，并且模拟发送改善指南
+        const userEmail = prompt("📩 留下你的邮箱，我将为你发送一份「失衡维度专属改善指南」PDF（内含行动模板+资源推荐）：", "your@email.com");
+        if (userEmail && userEmail.includes('@')) {
+            // 在真实场景可调用后端API，这里模拟友好提示
+            alert(`✅ 已收到！改善指南将在24小时内发送至 ${userEmail}\n（当前为演示版，后续将自动生成个性化报告）`);
+            // 可选记录事件：这里可埋点
+        } else if (userEmail && !userEmail.includes('@')) {
+            alert("请输入有效的邮箱地址，以便接收改善指南～");
+        }
+    }
+
+    // 初始化UI，生成滑块，更新雷达图
+    function init() {
+        buildSliders();
+        updateRadarChart();
+        updateInsights();
+        
+        // 绑定事件
+        downloadBtn.addEventListener('click', saveRadarAsImage);
+        resetBtn.addEventListener('click', resetScores);
+        getFullReportBtn.addEventListener('click', handleGetFullReport);
+    }
+
+    init();
+</script>
+</body>
+</html>
